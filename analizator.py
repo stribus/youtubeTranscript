@@ -47,9 +47,9 @@ def summary_OpenAI(text):
         messages=[
             {"role": "system", "content": "Você receber a transcrição do audio de um video. Por favor, resuma o que foi dito."},
             {"role": "user", "content": f"""transcrição do audio: 
-                        '''
+                        <transcricao>
                         {text}
-                        '''
+                        </transcricao>
                         """},
         ],
     )
