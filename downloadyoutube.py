@@ -1,13 +1,9 @@
-
 import pytubefix
 import ffmpeg
 import os
 import sys
 
-
-
-
-def validate_url(url):
+def validateUrl(url):
     if "https://www.youtube.com/watch?v=" in url:
         return True
     if "https://youtu.be/" in url:
@@ -16,27 +12,27 @@ def validate_url(url):
         return True
     return False
 
-def download_audio(video_url, tipo='mp3'):
-    yt = pytubefix.YouTube(video_url)
+def downloadAudio(videoUrl, tipo='mp3'):
+    yt = pytubefix.YouTube(videoUrl)
     if tipo == 'mp3' or tipo == 'wav':
-        stream  = yt.streams.filter(only_audio=True).first()
+        stream = yt.streams.filter(only_audio=True).first()
     else:
-        stream  = yt.streams.first()
+        stream = yt.streams.first()
     
-    #retira os caracters especiais e espaços do nome do video
+    # Retira os caracteres especiais e espaços do nome do vídeo
     filename = ''.join(e for e in yt.title if e.isalnum())
     ffmpeg.input(stream.url).output(f"{filename}.{tipo}").run()
     return f"{filename}.{tipo}"
 
-
 if __name__ == "__main__":
+
     if len(sys.argv) < 2:
         print("Falta o link do vídeo")
         print("Uso: python downloadyoutube.py <link do vídeo> [mp3|wav|mp4]")
         sys.exit(1)
         
     url = sys.argv[1]
-    if not validate_url(url):
+    if not validateUrl(url):
         print("Link inválido")
         sys.exit(1)
         
@@ -44,4 +40,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         tipo = sys.argv[2]
         
-    download_audio(url)
+    downloadAudio(url, tipo)

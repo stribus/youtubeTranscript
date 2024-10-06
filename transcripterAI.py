@@ -8,71 +8,69 @@ from groq import Groq
 import ffmpeg
 
 
-def get_chunk_duration_ms(mp3_file):
+def getChunkDurationMs(mp3File):
     """Retorna a duração de cada chunk em milissegundos, baseando-se no tamanho do arquivo de áudio.
         Limita o Tamanho de cada chunk a mais ou menos 20 mega bytes.
         sendo assim irá calcular a duração do chunk baseado no tamanho do arquivo.
     Args:
-        mp3_file (string): nome do arquivo de áudio
+        mp3File (string): nome do arquivo de áudio
     """
     
-    file_size = os.path.getsize(mp3_file)
-    max_file_size = 20 * 1024 * 1024  # 20 MB
-    audio = AudioSegment.from_mp3(mp3_file)
-    if file_size <= max_file_size:
+    fileSize = os.path.getsize(mp3File)
+    maxFileSize = 20 * 1024 * 1024  # 20 MB
+    audio = AudioSegment.from_mp3(mp3File)
+    if fileSize <= maxFileSize:
         return audio.duration_seconds * 1000
-    proportion = file_size / max_file_size
-    max_audio_duration = audio.duration_seconds / proportion
-    chunk_duration = max_audio_duration * 1000
-    chunk_duration = int(chunk_duration)
+    proportion = fileSize / maxFileSize
+    maxAudioDuration = audio.duration_seconds / proportion
+    chunkDuration = maxAudioDuration * 1000
+    chunkDuration = int(chunkDuration)
     # testa salvando um arquivo com a duração do chunk
-    chunk_size = max_file_size + 1
-    while chunk_size > max_file_size:
-        chunktest = audio[:chunk_duration]
-        chunktest.export("chunktest.mp3", format="mp3")
-        #pega o tamanho do arquivo criado
-        chunk_size = os.path.getsize("chunktest.mp3")      
-        os.remove("chunktest.mp3")        
-        if chunk_size > max_file_size:
-            chunk_duration = chunk_duration - 1000
-        elif chunk_size <= 0:
+    chunkSize = maxFileSize + 1
+    while chunkSize > maxFileSize:
+        chunkTest = audio[:chunkDuration]
+        chunkTest.export("chunkTest.mp3", format="mp3")
+        # pega o tamanho do arquivo criado
+        chunkSize = os.path.getsize("chunkTest.mp3")      
+        os.remove("chunkTest.mp3")
+        if chunkSize > maxFileSize:
+            chunkDuration = chunkDuration - 1000
+        elif chunkSize <= 0:
             print("Erro ao calcular o tamanho do chunk")
             sys.exit(1)
         else:
-            print(f"Chunk duration: {chunk_duration} ms")
-            print(f"Chunk size: {chunk_size/1024/1024} MB")
+            print(f"Chunk duration: {chunkDuration} ms")
+            print(f"Chunk size: {chunkSize/1024/1024} MB")
             break
         
-    return int(chunk_duration)
+    return int(chunkDuration)
 
 
-def convert2mp3(file_path):
+def convertToMp3(filePath):
     """Converte um arquivo de áudio para mp3
     Args:
-        file_path (string): caminho do arquivo de áudio
+        filePath (string): caminho do arquivo de áudio
     """
-    # audio = AudioSegment.from_file(file_path)
-    # audio.export(file_path, format="mp3")
-    print(f"Convertendo arquivo {file_path} para mp3")
-    newfilename = file_path.split('.')[0]+'.mp3'
-    ffmpeg.input(file_path).output(newfilename).run()
-    print(f"Arquivo {file_path} convertido para mp3")
+    print(f"Convertendo arquivo {filePath} para mp3")
+    newFilename = filePath.split('.')[0] + '.mp3'
+    ffmpeg.input(filePath).output(newFilename).run()
+    print(f"Arquivo {filePath} convertido para mp3")
 
-def transcribe_chunk(chunk, chunk_number, api_key):
-    max_retries = 5
-    base_delay = 1
+def transcribeChunk(chunk, chunkNumber, apiKey):
+    maxRetries = 5
+    baseDelay = 1
     
-    for attempt in range(max_retries):
+    for attempt in range(maxRetries):
         try:
             # Exportar o chunk para um arquivo temporário
-            temp_filename = f"temp_{chunk_number}.mp3"
-            chunk.export(temp_filename, format="mp3")
+            tempFilename = f"temp_{chunkNumber}.mp3"
+            chunk.export(tempFilename, format="mp3")
             
             # Transcrever usando Groq API
-            client = Groq(api_key=api_key)
-            with open(temp_filename, "rb") as file:
+            client = Groq(api_key=apiKey)
+            with open(tempFilename, "rb") as file:
                 transcription = client.audio.transcriptions.create(
-                    file=(temp_filename, file.read()),
+                    file=(tempFilename, file.read()),
                     model="whisper-large-v3",
                     language="pt",
                     response_format="verbose_json",
@@ -81,52 +79,51 @@ def transcribe_chunk(chunk, chunk_number, api_key):
             # Extrair o texto da transcrição
             text = transcription.text if hasattr(transcription, 'text') else ''
             
-            return chunk_number, text
+            return chunkNumber, text
         
         except Exception as e:
-            if attempt < max_retries - 1:
-                delay = (base_delay * 2 ** attempt) + (random.randint(0, 1000) / 1000)
-                print(f"Chunk {chunk_number}: Erro na requisição. Tentando novamente em {delay:.2f} segundos...")
+            if attempt < maxRetries - 1:
+                delay = (baseDelay * 2 ** attempt) + (random.randint(0, 1000) / 1000)
+                print(f"Chunk {chunkNumber}: Erro na requisição. Tentando novamente em {delay:.2f} segundos...")
                 time.sleep(delay)
             else:
-                print(f"Chunk {chunk_number}: Erro na requisição após {max_retries} tentativas; {e}")
-                return chunk_number, ""
+                print(f"Chunk {chunkNumber}: Erro na requisição após {maxRetries} tentativas; {e}")
+                return chunkNumber, ""
         
         finally:
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename)
+            if os.path.exists(tempFilename):
+                os.remove(tempFilename)
 
-def transcribe_large_audio(file_path, output_file, max_workers=4):
-    api_key = os.getenv('GROQ_API_KEY')
-    if api_key is None:
+def transcribeLargeAudio(filePath, outputFile, maxWorkers=4):
+    apiKey = os.getenv('GROQ_API_KEY')
+    if apiKey is None:
         raise ValueError("A variável de ambiente GROQ_API_KEY não está definida.")
     
-    #verifica se o arquivo é mp3 se não converte
-    if file_path.split('.')[-1] != 'mp3':
-        convert2mp3(file_path)
-        file_path = file_path.split('.')[0]+'.mp3'
+    # verifica se o arquivo é mp3 se não converte
+    if filePath.split('.')[-1] != 'mp3':
+        convertToMp3(filePath)
+        filePath = filePath.split('.')[0] + '.mp3'
     else:
-        print(f"Arquivo {file_path} é mp3")
+        print(f"Arquivo {filePath} é mp3")
     
-    
-    chunk_duration_ms = get_chunk_duration_ms(file_path)
+    chunkDurationMs = getChunkDurationMs(filePath)
     
     # Carregar o arquivo de áudio
-    audio = AudioSegment.from_mp3(file_path) 
+    audio = AudioSegment.from_mp3(filePath) 
     
     # Dividir o áudio em chunks
-    chunks = [audio[i:i+chunk_duration_ms] for i in range(0, len(audio), chunk_duration_ms)]
+    chunks = [audio[i:i+chunkDurationMs] for i in range(0, len(audio), chunkDurationMs)]
     
     # processar os chunks sequencialmente e com 0.5 segundos entre cada um
     # para evitar erros de limite de requisições
     results = []
     for i, chunk in enumerate(chunks):
-        chunk_number, text = transcribe_chunk(chunk, i, api_key)
-        results.append((chunk_number, text))
+        chunkNumber, text = transcribeChunk(chunk, i, apiKey)
+        results.append((chunkNumber, text))
         time.sleep(0.5)    
     
     # Escrever os resultados no arquivo de saída
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(outputFile, 'w', encoding='utf-8') as f:
         for _, text in results:
             f.write(f"{text}\n")
     
@@ -141,7 +138,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     # Uso da função
-    input_file = sys.argv[1]
-    output_file = input_file.split("\\")[-1].split(".")[0] + "AI.txt"
-    print(f"Transcrevendo o arquivo de áudio {input_file} para {output_file}")
-    transcribe_large_audio(input_file, output_file, max_workers=4)
+    inputFile = sys.argv[1]
+    outputFile = inputFile.split("\\")[-1].split(".")[0] + "AI.txt"
+    print(f"Transcrevendo o arquivo de áudio {inputFile} para {outputFile}")
+    transcribeLargeAudio(inputFile, outputFile, maxWorkers=4)
